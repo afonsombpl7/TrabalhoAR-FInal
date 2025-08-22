@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Teste Câmara</title></head>
+  <body>
+    <p>Se vires o vídeo em baixo, a câmara está OK nesta origem.</p>
+    <video id="v" autoplay playsinline style="width:100%;max-width:480px;background:#000"></video>
+    <script>
+      (async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+          document.getElementById('v').srcObject = stream;
+        } catch (e) {
+          alert("Erro a abrir a câmara: " + e.name + " — " + e.message);
+          console.error(e);
+        }
+      })();
+    </script>
+  </body>
+</html>
