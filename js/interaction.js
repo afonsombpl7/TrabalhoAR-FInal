@@ -1,3 +1,4 @@
+// Toque no modelo -> rotação suave (fallback se não houver clip de animação)
 AFRAME.registerComponent('tap-actions', {
   init: function () {
     const el = this.el; // <a-gltf-model>
@@ -26,8 +27,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const objA = document.getElementById('objA');
   if (objA) objA.setAttribute('tap-actions', '');
 
-
-  ['alvoA'/*,'alvoB'*/].forEach(id => {
+  ['alvoA'].forEach(id => {
     const target = document.getElementById(id);
     if (!target) return;
     target.addEventListener('targetFound', () => status.textContent = id + ': marcador detetado!');

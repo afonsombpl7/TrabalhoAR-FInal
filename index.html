@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AR (MindAR + A-Frame)</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <!-- A-Frame e MindAR (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <!-- Interação -->
+  <script defer src="js/interaction.js"></script>
+  <!-- PWA (opcional) -->
+  <link rel="manifest" href="pwa/manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+</head>
+<body>
+  <div id="ui">
+    <h3>Aponta a câmara ao teu marcador</h3>
+    <button id="resetBtn">Reset</button>
+    <div id="status">A iniciar...</div>
+  </div>
+
+  <a-scene
+    mindar-image="imageTargetSrc: markers/targets.mind; filterMinCF:0.0001; filterBeta:0.001;"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: true"
+    renderer="colorManagement: true; logarithmicDepthBuffer: true">
+
+    <a-assets>
+      <!-- modelo que EXISTE no teu repo -->
+      <a-asset-item id="mdlA" src="assets/models/objeto.glb"></a-asset-item>
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!-- único marcador (index 0 no teu targets.mind) -->
+    <a-entity mindar-image-target="targetIndex: 0" id="alvoA">
+      <a-gltf-model id="objA" src="#mdlA" scale="0.5 0.5 0.5" position="0 0 0" rotation="0 0 0" animation-mixer></a-gltf-model>
+    </a-entity>
+
+  </a-scene>
+</body>
+</html>
