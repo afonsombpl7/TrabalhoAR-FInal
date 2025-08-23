@@ -3,19 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <title>MindAR iOS — Permissão primeiro</title>
+  <title>MindAR Debug (fix)</title>
   <style>
     html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,Arial}
     #ui{position:fixed;inset:0;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;z-index:10;background:#111;color:#fff;text-align:center;padding:16px}
     #log{position:fixed;left:8px;right:8px;top:8px;z-index:9;background:rgba(0,0,0,.7);color:#fff;padding:8px;border-radius:8px;font-size:12px}
     button{padding:12px 16px;border:0;border-radius:10px}
   </style>
-  <!-- Carrega A-Frame + MindAR (CDN alternativo unpkg para evitar caches esquisitos) -->
-  <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
-  <script src="https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <!-- CDNs estáveis -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 </head>
 <body>
-  <!-- UI inicial para pedir permissão -->
   <div id="ui">
     <h2>Ativar câmara para AR</h2>
     <p>Toca em “Permitir câmara”. Depois aponta para o teu marcador.</p>
@@ -27,65 +26,62 @@
 
   <script>
     const log = (m)=> document.getElementById('log').textContent = m;
+    const TARGET_URL = 'https://afonsombpl7.github.io/TrabalhoAR-FInal/markers/targets.mind'; // absoluto (sem 404)
 
     async function pedirCamera() {
       try {
         log('A pedir permissão à câmara…');
-        // pede permissão explicitamente (traseira, playsinline)
-        const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}, audio:false});
-        // fecha stream (MindAR vai abrir a câmara dele)
-        stream.getTracks().forEach(t=>t.stop());
+        const s = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}, audio:false});
+        s.getTracks().forEach(t=>t.stop());
         log('Permissão concedida. A carregar AR…');
-
-        // remove o ecrã de UI
         document.getElementById('ui').style.display = 'none';
 
-        // cria a cena A-Frame + MindAR SÓ depois da permissão
         const scene = document.createElement('a-scene');
         scene.setAttribute('id','scene');
-        scene.setAttribute('mindar-image','imageTargetSrc: ./markers/targets.mind;');
+        scene.setAttribute('mindar-image', `imageTargetSrc: ${TARGET_URL};`);
         scene.setAttribute('vr-mode-ui','enabled:false');
         scene.setAttribute('device-orientation-permission-ui','enabled:true');
         scene.setAttribute('renderer','colorManagement: true; logarithmicDepthBuffer: true');
 
-        // luzes
         const amb = document.createElement('a-entity');
         amb.setAttribute('light','type: ambient; intensity: 0.9');
         const dir = document.createElement('a-entity');
         dir.setAttribute('light','type: directional; intensity: 1');
         dir.setAttribute('position','0 1 1');
 
-        // câmara
         const cam = document.createElement('a-camera');
         cam.setAttribute('position','0 0 0');
         cam.setAttribute('look-controls','enabled:false');
 
-        // alvo + CUBO de teste
         const target = document.createElement('a-entity');
         target.setAttribute('mindar-image-target','targetIndex: 0');
         target.setAttribute('id','alvoA');
 
         const cube = document.createElement('a-box');
         cube.setAttribute('position','0 0.3 0');
-        cube.setAttribute('depth','0.5');
-        cube.setAttribute('height','0.5');
-        cube.setAttribute('width','0.5');
-
+        cube.setAttribute('depth','0.5'); cube.setAttribute('height','0.5'); cube.setAttribute('width','0.5');
         target.appendChild(cube);
-        scene.appendChild(amb);
-        scene.appendChild(dir);
-        scene.appendChild(cam);
-        scene.appendChild(target);
+
+        scene.appendChild(amb); scene.appendChild(dir); scene.appendChild(cam); scene.appendChild(target);
         document.body.appendChild(scene);
 
-        // logs úteis
-        scene.addEventListener('camera-init', ()=> log('Câmara pronta — aponte ao marcador'));
+        // logs
+        scene.addEventListener('loaded', ()=> log('Cena carregada…'));
+        scene.addEventListener('camera-init',  ()=> log('Câmara pronta — aponte ao marcador'));
         scene.addEventListener('camera-error', e=> log('Erro câmara: ' + (e.detail?.message || e.detail || 'desconhecido')));
-        scene.addEventListener('arReady', ()=> log('AR pronto — aponte ao marcador'));
-        scene.addEventListener('arError', e=> log('Erro AR: ' + (e.detail?.message || e.detail || 'desconhecido')));
+        scene.addEventListener('arReady',      ()=> log('AR pronto — aponte ao marcador'));
+        scene.addEventListener('arError',  e   => log('Erro AR: ' + (e.detail?.message || e.detail || 'desconhecido')));
 
         target.addEventListener('targetFound', ()=> log('Marcador detetado!'));
-        target.addEventListener('targetLost', ()=> log('Marcador perdido'));
+        target.addEventListener('targetLost',  ()=> log('Marcador perdido'));
+
+        // watchdog: se em 6s não mudou de estado, mostra pista
+        setTimeout(()=> {
+          const txt = document.getElementById('log').textContent;
+          if (txt.includes('carregar AR…')) {
+            log('Ainda a carregar… confirma que o ficheiro do alvo abre: ' + TARGET_URL);
+          }
+        }, 6000);
       } catch (e) {
         log('Não foi possível aceder à câmara: ' + e.name + ' — ' + e.message);
         alert('Ativa a câmara para o browser nas Definições do iPhone e volta a tentar.');
