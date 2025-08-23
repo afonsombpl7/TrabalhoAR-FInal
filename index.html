@@ -3,46 +3,96 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <title>MindAR Debug</title>
-  <script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <title>MindAR iOS — Permissão primeiro</title>
   <style>
-    html,body{margin:0;height:100%;overflow:hidden}
-    #log{position:fixed;top:8px;left:8px;right:8px;z-index:9;background:rgba(0,0,0,.7);color:#fff;padding:8px;border-radius:8px;font:12px system-ui}
-    button{position:fixed;top:8px;right:8px;z-index:10}
+    html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,Arial}
+    #ui{position:fixed;inset:0;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;z-index:10;background:#111;color:#fff;text-align:center;padding:16px}
+    #log{position:fixed;left:8px;right:8px;top:8px;z-index:9;background:rgba(0,0,0,.7);color:#fff;padding:8px;border-radius:8px;font-size:12px}
+    button{padding:12px 16px;border:0;border-radius:10px}
   </style>
+  <!-- Carrega A-Frame + MindAR (CDN alternativo unpkg para evitar caches esquisitos) -->
+  <script src="https://unpkg.com/aframe@1.5.0/dist/aframe.min.js"></script>
+  <script src="https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 </head>
 <body>
-  <div id="log">a iniciar…</div>
-  <button onclick="location.reload()">Reset</button>
+  <!-- UI inicial para pedir permissão -->
+  <div id="ui">
+    <h2>Ativar câmara para AR</h2>
+    <p>Toca em “Permitir câmara”. Depois aponta para o teu marcador.</p>
+    <button id="go">Permitir câmara</button>
+    <div style="opacity:.7;font-size:12px">Se não aparecer o pedido, vai a Definições &gt; Safari/Chrome &gt; Câmara = Permitir</div>
+  </div>
 
-  <a-scene id="scene"
-    mindar-image="imageTargetSrc: ./markers/targets.mind;"
-    vr-mode-ui="enabled:false"
-    device-orientation-permission-ui="enabled:true"
-    renderer="colorManagement: true; logarithmicDepthBuffer: true">
-
-    <!-- luzes -->
-    <a-entity light="type: ambient; intensity: 0.9"></a-entity>
-    <a-entity light="type: directional; intensity: 1" position="0 1 1"></a-entity>
-
-    <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
-
-    <!-- CUBO DE TESTE -->
-    <a-entity mindar-image-target="targetIndex: 0" id="alvoA">
-      <a-box position="0 0.3 0" depth="0.5" height="0.5" width="0.5"></a-box>
-    </a-entity>
-  </a-scene>
+  <div id="log">A iniciar…</div>
 
   <script>
-    const lg = m => document.getElementById('log').textContent = m;
-    const sc = document.getElementById('scene');
-    sc.addEventListener('camera-init',  ()=> lg('Câmara pronta — aponte ao marcador'));
-    sc.addEventListener('camera-error', e=> lg('Erro câmara: ' + (e.detail?.message || e.detail)));
-    sc.addEventListener('arReady',      ()=> lg('AR pronto — aponte ao marcador'));
-    sc.addEventListener('arError',  e   => lg('Erro AR: ' + (e.detail?.message || e.detail)));
-    document.getElementById('alvoA')
-      .addEventListener('targetFound', ()=> lg('Marcador detetado!'));
+    const log = (m)=> document.getElementById('log').textContent = m;
+
+    async function pedirCamera() {
+      try {
+        log('A pedir permissão à câmara…');
+        // pede permissão explicitamente (traseira, playsinline)
+        const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}, audio:false});
+        // fecha stream (MindAR vai abrir a câmara dele)
+        stream.getTracks().forEach(t=>t.stop());
+        log('Permissão concedida. A carregar AR…');
+
+        // remove o ecrã de UI
+        document.getElementById('ui').style.display = 'none';
+
+        // cria a cena A-Frame + MindAR SÓ depois da permissão
+        const scene = document.createElement('a-scene');
+        scene.setAttribute('id','scene');
+        scene.setAttribute('mindar-image','imageTargetSrc: ./markers/targets.mind;');
+        scene.setAttribute('vr-mode-ui','enabled:false');
+        scene.setAttribute('device-orientation-permission-ui','enabled:true');
+        scene.setAttribute('renderer','colorManagement: true; logarithmicDepthBuffer: true');
+
+        // luzes
+        const amb = document.createElement('a-entity');
+        amb.setAttribute('light','type: ambient; intensity: 0.9');
+        const dir = document.createElement('a-entity');
+        dir.setAttribute('light','type: directional; intensity: 1');
+        dir.setAttribute('position','0 1 1');
+
+        // câmara
+        const cam = document.createElement('a-camera');
+        cam.setAttribute('position','0 0 0');
+        cam.setAttribute('look-controls','enabled:false');
+
+        // alvo + CUBO de teste
+        const target = document.createElement('a-entity');
+        target.setAttribute('mindar-image-target','targetIndex: 0');
+        target.setAttribute('id','alvoA');
+
+        const cube = document.createElement('a-box');
+        cube.setAttribute('position','0 0.3 0');
+        cube.setAttribute('depth','0.5');
+        cube.setAttribute('height','0.5');
+        cube.setAttribute('width','0.5');
+
+        target.appendChild(cube);
+        scene.appendChild(amb);
+        scene.appendChild(dir);
+        scene.appendChild(cam);
+        scene.appendChild(target);
+        document.body.appendChild(scene);
+
+        // logs úteis
+        scene.addEventListener('camera-init', ()=> log('Câmara pronta — aponte ao marcador'));
+        scene.addEventListener('camera-error', e=> log('Erro câmara: ' + (e.detail?.message || e.detail || 'desconhecido')));
+        scene.addEventListener('arReady', ()=> log('AR pronto — aponte ao marcador'));
+        scene.addEventListener('arError', e=> log('Erro AR: ' + (e.detail?.message || e.detail || 'desconhecido')));
+
+        target.addEventListener('targetFound', ()=> log('Marcador detetado!'));
+        target.addEventListener('targetLost', ()=> log('Marcador perdido'));
+      } catch (e) {
+        log('Não foi possível aceder à câmara: ' + e.name + ' — ' + e.message);
+        alert('Ativa a câmara para o browser nas Definições do iPhone e volta a tentar.');
+      }
+    }
+
+    document.getElementById('go').addEventListener('click', pedirCamera);
   </script>
 </body>
 </html>
