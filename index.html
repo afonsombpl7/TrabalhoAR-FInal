@@ -3,92 +3,110 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <title>AR – MindAR + A-Frame</title>
+  <title>AR – Debug total</title>
   <style>
     html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,Arial}
     #ui{position:fixed;inset:0;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;z-index:10;background:#111;color:#fff;text-align:center;padding:16px}
-    #log{position:fixed;left:8px;right:8px;top:8px;z-index:9;background:rgba(0,0,0,.7);color:#fff;padding:8px;border-radius:8px;font-size:12px}
+    #log{position:fixed;left:8px;right:8px;top:8px;z-index:9;background:rgba(0,0,0,.85);color:#0f0;padding:8px;border-radius:8px;font:12px/1.3 monospace;white-space:pre-wrap}
     button{padding:12px 16px;border:0;border-radius:10px}
   </style>
 
-  <!-- libs locais -->
-<script src="js/vendor/aframe.min.js"></script>
-<script src="js/vendor/mindar-image-aframe.prod.js"></script>
-
+  <!-- JS locais (usa SEM ./) -->
+  <script src="js/vendor/aframe.min.js"></script>
+  <script src="js/vendor/mindar-image-aframe.prod.js"></script>
 </head>
 <body>
-  <!-- ecrã inicial para pedir permissões -->
   <div id="ui">
     <h2>Ativar câmara para AR</h2>
     <p>Toca em “Permitir câmara” e aponta ao marcador.</p>
     <button id="go">Permitir câmara</button>
   </div>
 
-  <!-- log de estado (debug) -->
-  <div id="log">A iniciar…</div>
+  <div id="log">boot…</div>
 
   <script>
-    const log = (m)=> document.getElementById('log').textContent = m;
+    // logger visível
+    const lg = (m)=> document.getElementById('log').textContent += '\n' + m;
+    document.getElementById('log').textContent = 'boot ok';
 
-    // URL ABSOLUTO do teu .mind (não depende de onde abres o site)
-    const TARGET_URL = 'https://afonsombpl7.github.io/TrabalhoAR-FInal/markers/targets.mind';
+    // apanhar QUALQUER erro JS
+    window.onerror = (msg, src, line, col, err)=>{
+      lg(`JS ERROR: ${msg} @ ${src}:${line}:${col}`);
+      if (err && err.stack) lg(err.stack);
+    };
+
+    // confirmar carregamento das libs
+    lg('check AFRAME=' + (typeof AFRAME));
+    lg('check MindAR comp=' + (AFRAME && AFRAME.components && ('mindar-image-system' in AFRAME.systems)));
+
+    // confirmar que os 2 JS locais existem (200)
+    (async ()=>{
+      const urls = [
+        'js/vendor/aframe.min.js',
+        'js/vendor/mindar-image-aframe.prod.js',
+        'markers/targets.mind',
+        'assets/models/objeto.glb'
+      ];
+      for (const u of urls) {
+        try {
+          const r = await fetch(u, {cache:'no-store'});
+          lg(`FETCH ${u} -> ${r.status}`);
+        } catch(e) {
+          lg(`FETCH ${u} -> ERROR ${e.message}`);
+        }
+      }
+    })();
+
+    const TARGET_URL_ABS = 'https://afonsombpl7.github.io/TrabalhoAR-FInal/markers/targets.mind';
 
     async function start() {
       try {
-        log('A pedir permissão à câmara…');
-        const s = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}, audio:false});
-        s.getTracks().forEach(t=>t.stop()); // libertar; MindAR vai abrir
-        document.getElementById('ui').style.display = 'none';
-        log('Permissão concedida. A carregar AR…');
+        lg('Permissões: a pedir câmara…');
+        const s = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}, audio:false});
+        s.getTracks().forEach(t=>t.stop());
+        document.getElementById('ui').style.display='none';
+        lg('Permissões: OK — preload .mind');
 
-        // Pré-carregar o .mind sem cache (evita SW/cache antigo)
-        const res = await fetch(TARGET_URL, {cache:'no-store'});
-        if (!res.ok) { log('Erro a obter alvo: HTTP '+res.status); return; }
+        // preload do .mind para evitar cache/SW
+        const res = await fetch(TARGET_URL_ABS, {cache:'no-store'});
+        lg('preload .mind HTTP ' + res.status);
+        if (!res.ok) { lg('ERRO no alvo .mind'); return; }
         const blob = await res.blob();
         const mindURL = URL.createObjectURL(blob);
 
-        // --- construir a cena ---
+        // construir cena
         const scene = document.createElement('a-scene');
-        scene.setAttribute('id','scene');
         scene.setAttribute('mindar-image', `imageTargetSrc: ${mindURL};`);
         scene.setAttribute('vr-mode-ui','enabled:false');
         scene.setAttribute('device-orientation-permission-ui','enabled:true');
-        scene.setAttribute('renderer','colorManagement: true; physicallyCorrectLights: true; logarithmicDepthBuffer: true');
+        scene.setAttribute('renderer','colorManagement:true; physicallyCorrectLights:true; logarithmicDepthBuffer:true');
 
-        // luzes
-        const amb = document.createElement('a-entity');
-        amb.setAttribute('light','type: ambient; intensity: 0.9');
-        const dir = document.createElement('a-entity');
-        dir.setAttribute('light','type: directional; intensity: 1');
-        dir.setAttribute('position','0 1 1');
-
-        // assets (o teu modelo)
         const assets = document.createElement('a-assets');
         const mdl = document.createElement('a-asset-item');
         mdl.setAttribute('id','mdlA');
-        mdl.setAttribute('src','./assets/models/objeto.glb');
+        mdl.setAttribute('src','assets/models/objeto.glb');
         assets.appendChild(mdl);
 
-        // camara
+        const amb = document.createElement('a-entity');
+        amb.setAttribute('light','type:ambient;intensity:0.9');
+        const dir = document.createElement('a-entity');
+        dir.setAttribute('light','type:directional;intensity:1');
+        dir.setAttribute('position','0 1 1');
+
         const cam = document.createElement('a-camera');
-        cam.setAttribute('position','0 0 0');
         cam.setAttribute('look-controls','enabled:false');
 
-        // alvo + modelo
         const target = document.createElement('a-entity');
-        target.setAttribute('mindar-image-target','targetIndex: 0');
-        target.setAttribute('id','alvoA');
+        target.setAttribute('mindar-image-target','targetIndex:0');
 
         const gltf = document.createElement('a-gltf-model');
         gltf.setAttribute('src','#mdlA');
-        gltf.setAttribute('position','0 0.05 0');   // levanta ligeiro
-        gltf.setAttribute('scale','0.2 0.2 0.2');   // ajusta se ficar grande/pequeno
-        gltf.setAttribute('rotation','0 0 0');
+        gltf.setAttribute('position','0 0.05 0');
+        gltf.setAttribute('scale','0.2 0.2 0.2');
         gltf.setAttribute('animation-mixer','');
 
         target.appendChild(gltf);
 
-        // montar tudo
         scene.appendChild(assets);
         scene.appendChild(amb);
         scene.appendChild(dir);
@@ -96,17 +114,15 @@
         scene.appendChild(target);
         document.body.appendChild(scene);
 
-        // logs úteis
-        scene.addEventListener('loaded', ()=> log('Cena carregada…'));
-        scene.addEventListener('camera-init',  ()=> log('Câmara pronta — aponte ao marcador'));
-        scene.addEventListener('camera-error', e=> log('Erro câmara: ' + (e.detail?.message || e.detail || 'desconhecido')));
-        scene.addEventListener('arReady',      ()=> log('AR pronto — aponte ao marcador'));
-        scene.addEventListener('arError',  e   => log('Erro AR: ' + (e.detail?.message || e.detail || 'desconhecido')));
-        target.addEventListener('targetFound', ()=> log('Marcador detetado!'));
-        target.addEventListener('targetLost',  ()=> log('Marcador perdido'));
+        scene.addEventListener('loaded', ()=> lg('AFRAME: scene loaded'));
+        scene.addEventListener('camera-init', ()=> lg('AFRAME: camera-init (pronto)'));
+        scene.addEventListener('camera-error', e=> lg('AFRAME: camera-error ' + (e.detail?.message || e.detail)));
+        scene.addEventListener('arReady', ()=> lg('MindAR: arReady'));
+        scene.addEventListener('arError', e=> lg('MindAR: arError ' + (e.detail?.message || e.detail)));
+        target.addEventListener('targetFound', ()=> lg('MindAR: targetFound'));
+        target.addEventListener('targetLost',  ()=> lg('MindAR: targetLost'));
       } catch (e) {
-        log('Não foi possível aceder à câmara: ' + e.name + ' — ' + e.message);
-        alert('Nas Definições do iPhone, dá permissão de câmara ao Safari/Chrome e tenta novamente.');
+        lg('getUserMedia ERROR: ' + e.name + ' — ' + e.message);
       }
     }
     document.getElementById('go').addEventListener('click', start);
